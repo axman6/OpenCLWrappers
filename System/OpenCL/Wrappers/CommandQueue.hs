@@ -36,6 +36,6 @@ clGetCommandQueueInfo ctx (CommandQueueInfo param_name) = wrapGetInfo (raw_clGet
 
 {-# DEPRECATED clSetCommandQueueProperty "Deprecated in C api" #-}
 clSetCommandQueueProperty :: CommandQueue -> CommandQueueProperties -> Bool -> IO (Either ErrorCode CommandQueueProperties)
-clSetCommandQueueProperty queue (CommandQueueProperties properties) enable = alloca $ \old_properties ->
-    wrapError (raw_clSetCommandQueueProperty queue properties (if enable then clTrue else clFalse) old_properties) >>=
-        maybe (fmap (Right . CommandQueueProperties) $ peek old_properties) (return . Left)
+clSetCommandQueueProperty queue (CommandQueueProperties properties) enable = alloca $ \old_properties -> do
+    err <- wrapError (raw_clSetCommandQueueProperty queue properties (if enable then clTrue else clFalse) old_properties)
+    handleEither err $ \_ -> fmap (Right . CommandQueueProperties) $ peek old_properties

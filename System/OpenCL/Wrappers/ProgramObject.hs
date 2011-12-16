@@ -14,7 +14,8 @@ import System.OpenCL.Wrappers.Types
 import System.OpenCL.Wrappers.Errors
 import System.OpenCL.Wrappers.Utils
 import System.OpenCL.Wrappers.Raw
-import Foreign
+import Foreign hiding (unsafeForeignPtrToPtr)
+import Foreign.ForeignPtr.Unsafe (unsafeForeignPtrToPtr)
 import Foreign.C
 import Control.Applicative
 import qualified Data.ByteString as SBS

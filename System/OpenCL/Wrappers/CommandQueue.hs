@@ -19,10 +19,10 @@ clCreateCommandQueue ctx devid props = let
     CommandQueueProperties properties = combineOr props
         in wrapErrorEither $ raw_clCreateCommandQueue ctx devid properties 
 
-clRetainCommandQueue :: CommandQueue -> IO (Maybe ErrorCode)
+clRetainCommandQueue :: CommandQueue -> IO (Either ErrorCode ())
 clRetainCommandQueue queue = wrapError (raw_clRetainCommandQueue queue)
 
-clReleaseCommandQueue :: CommandQueue -> IO (Maybe ErrorCode)
+clReleaseCommandQueue :: CommandQueue -> IO (Either ErrorCode ())
 clReleaseCommandQueue queue = wrapError (raw_clReleaseCommandQueue queue)
 
 clGetCommandQueueInfo :: CommandQueue -> CommandQueueInfo -> IO (Either ErrorCode CLCommandQueueInfoRetval)

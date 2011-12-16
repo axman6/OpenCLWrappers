@@ -49,13 +49,13 @@ clCreateProgramWithBinary context devbin_pair =
           num_devices = length device_list
           (device_list,bins) = unzip devbin_pair
         
-clRetainProgram :: Program -> IO (Maybe ErrorCode) 
+clRetainProgram :: Program -> IO (Either ErrorCode ()) 
 clRetainProgram prog = wrapError $ raw_clRetainProgram prog
 
-clReleaseProgram :: Program -> IO (Maybe ErrorCode) 
+clReleaseProgram :: Program -> IO (Either ErrorCode ()) 
 clReleaseProgram prog = wrapError $ raw_clReleaseProgram prog
 
-clBuildProgram :: Program -> [DeviceID] -> String -> (Maybe BuildProgramCallback) -> Ptr () -> IO (Maybe ErrorCode)
+clBuildProgram :: Program -> [DeviceID] -> String -> (Maybe BuildProgramCallback) -> Ptr () -> IO (Either ErrorCode ())
 clBuildProgram program devices ops pfn_notifyF user_data = 
     allocaArray num_devices $ \device_list -> 
     withCString ops $ \options -> do 
@@ -64,7 +64,7 @@ clBuildProgram program devices ops pfn_notifyF user_data =
         wrapError $ raw_clBuildProgram program (fromIntegral num_devices) device_list options pfn_notify user_data
     where num_devices = length devices   
 
-clUnloadCompiler :: IO (Maybe ErrorCode)
+clUnloadCompiler :: IO (Either ErrorCode ())
 clUnloadCompiler = wrapError $ raw_clUnloadCompiler
 
 clGetProgramInfo :: Program -> ProgramInfo -> IO (Either ErrorCode CLProgramInfoRetval)

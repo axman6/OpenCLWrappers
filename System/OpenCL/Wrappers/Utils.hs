@@ -11,35 +11,40 @@ import Control.Monad.Cont
 import Data.Bits((.|.))
 import Unsafe.Coerce(unsafeCoerce)
 
-wrapError :: IO CLint -> IO (Maybe ErrorCode)
-wrapError thunk = thunk >>= \errcode -> if ErrorCode errcode == clSuccess then return Nothing else return . Just . ErrorCode $ errcode
+handleEither :: Monad m => Either a b -> (b -> m (Either a c)) -> m (Either a c)
+handleEither (Left e) _ = return (Left e)
+handleEither (Right a) f = f a
+
+wrapError :: IO CLint -> IO (Either ErrorCode ())
+wrapError thunk = thunk >>= \errcode ->
+    if ErrorCode errcode == clSuccess then return (Right ()) else return . Left . ErrorCode $ errcode
 
 wrapErrorEither :: (Ptr CLint -> IO a) -> IO (Either ErrorCode a)
 wrapErrorEither thunk = alloca $ \errorP -> do
     ret <- thunk errorP
     err <- ErrorCode <$> peek errorP
-    if err == clSuccess
-        then return . Right $ ret
-        else return . Left $ err 
+    return $ if err == clSuccess
+                then Right $ ret
+                else Left $ err 
                 
 wrapGetInfo :: (CLsizei -> Ptr () -> Ptr CLsizei -> IO CLint) -> IO (Either ErrorCode (ForeignPtr (), CLsizei))
-wrapGetInfo raw_infoFn = alloca $ \value_size_ret ->
-    wrapError (raw_infoFn 0 nullPtr value_size_ret) >>=
-        maybe (do retsize <- peek value_size_ret
-                  param_data <- (mallocForeignPtrBytes . fromIntegral $ retsize) :: IO (ForeignPtr ())
-                  wrapError (withForeignPtr param_data $ \param_dataP -> raw_infoFn retsize param_dataP nullPtr) >>=
-                      maybe (return (Right (param_data,retsize))) (return.Left))
-                  (return.Left)
+wrapGetInfo raw_infoFn = alloca $ \value_size_ret -> do
+    err <- wrapError (raw_infoFn 0 nullPtr value_size_ret)
+    handleEither err $ \_ -> do
+        retsize <- peek value_size_ret
+        param_data <- (mallocForeignPtrBytes . fromIntegral $ retsize) :: IO (ForeignPtr ())
+        x <- wrapError (withForeignPtr param_data $ \param_dataP ->  raw_infoFn retsize param_dataP nullPtr)
+        return $ either Left (\_ -> Right (param_data,retsize)) x
 
 wrapGetNumElements :: Storable a => (CLuint -> Ptr a -> Ptr CLuint -> IO CLint) -> IO (Either ErrorCode [a])
-wrapGetNumElements raw_Fn = alloca (\value_size_ret ->
-    wrapError (raw_Fn 0 nullPtr value_size_ret) >>=
-        maybe (do
-            retsize <- peek value_size_ret
-            allocaArray (fromIntegral retsize)
-                (\param_dataP -> wrapError (raw_Fn retsize param_dataP nullPtr) >>=
-                    maybe (fmap Right $ peekArray (fromIntegral retsize) param_dataP) (return.Left)))
-            (return.Left))
+wrapGetNumElements raw_Fn = alloca $ \value_size_ret -> do
+    err <- wrapError (raw_Fn 0 nullPtr value_size_ret)
+    handleEither err $ \_ -> do
+       retsize <- peek value_size_ret
+       allocaArray (fromIntegral retsize) $ \param_dataP -> do
+           err <- wrapError (raw_Fn retsize param_dataP nullPtr)
+           handleEither err $ \_ -> fmap Right $ peekArray (fromIntegral retsize) param_dataP
+                
 
 withArrayNull0 a as = withArrayNull $ as ++ [a]
 

@@ -12,7 +12,7 @@ import System.OpenCL.Wrappers.Raw
 import Foreign.Marshal.Array(withArray)
 
 
-clWaitForEvents :: [Event] -> IO (Maybe ErrorCode)
+clWaitForEvents :: [Event] -> IO (Either ErrorCode ())
 clWaitForEvents evts = withArray evts (\eventP -> wrapError $ raw_clWaitForEvents (fromIntegral nEvents) eventP)
     where nEvents = length evts
                             
@@ -25,10 +25,10 @@ clGetEventInfo obj (EventInfo param_name) = wrapGetInfo (raw_clGetEventInfo obj 
             | c == clEventCommandExecutionStatus -> peekOneInfo EventInfoRetvalCLint x
             | c == clEventReferenceCount         -> peekOneInfo EventInfoRetvalCLuint x )
 
-clRetainEvent :: Event -> IO (Maybe ErrorCode)
+clRetainEvent :: Event -> IO (Either ErrorCode ())
 clRetainEvent evt = wrapError $ raw_clRetainEvent evt
 
-clReleaseEvent :: Event -> IO (Maybe ErrorCode)
+clReleaseEvent :: Event -> IO (Either ErrorCode ())
 clReleaseEvent evt = wrapError $ raw_clReleaseEvent evt 
 
 clGetEventProfilingInfo :: Event -> ProfilingInfo -> IO (Either ErrorCode CLEventProfilingInfoRetval)

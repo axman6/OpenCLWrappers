@@ -26,20 +26,17 @@ clCreateKernel program init_name = withCString init_name (\x -> wrapErrorEither 
 clCreateKernelsInProgram :: Program -> CLuint -> IO (Either ErrorCode [Kernel])
 clCreateKernelsInProgram program num_kernels = allocaArray (fromIntegral num_kernels) $ \kernels -> alloca $ \num_kernels_ret -> do
     err <- wrapError $ raw_clCreateKernelsInProgram program num_kernels kernels num_kernels_ret
-    if err== Nothing
-        then do 
-            nkr <- peek num_kernels_ret
-            Right <$> peekArray (fromIntegral nkr) kernels
-        else
-            return $ Left . fromJust $ err
+    handleEither err $ \_ -> do
+		nkr <- peek num_kernels_ret
+		Right <$> peekArray (fromIntegral nkr) kernels
 
-clRetainKernel :: Kernel -> IO (Maybe ErrorCode)
+clRetainKernel :: Kernel -> IO (Either ErrorCode ())
 clRetainKernel kernel = wrapError $ raw_clRetainKernel kernel
 
-clReleaseKernel :: Kernel -> IO (Maybe ErrorCode)
+clReleaseKernel :: Kernel -> IO (Either ErrorCode ())
 clReleaseKernel kernel = wrapError $ raw_clRetainKernel kernel
 
-clSetKernelArg :: Kernel -> CLuint -> CLsizei -> Ptr () -> IO (Maybe ErrorCode)
+clSetKernelArg :: Kernel -> CLuint -> CLsizei -> Ptr () -> IO (Either ErrorCode ())
 clSetKernelArg kernel arg_index arg_size arg_value = 
     wrapError $ raw_clSetKernelArg kernel arg_index arg_size arg_value
 
@@ -68,9 +65,7 @@ clEnqueueNDRangeKernel queue kernel global_work_sizeL local_work_sizeL event_wai
     withArrayNull event_wait_listL $ \event_wait_list ->
     alloca $ \event -> do
         err <- wrapError $ raw_clEnqueueNDRangeKernel queue kernel (fromIntegral work_dim) nullPtr global_work_size local_work_size (fromIntegral num_events_in_wait_list) event_wait_list event
-        if err == Nothing
-            then Right <$> peek event
-            else return $ Left . fromJust $ err
+        handleEither err $ \_ -> Right <$> peek event
     where work_dim = length global_work_sizeL
           num_events_in_wait_list = length event_wait_listL
         
@@ -80,9 +75,7 @@ clEnqueueTask queue kernel event_wait_listL =
     alloca $ \event -> do
         pokeArray event_wait_list event_wait_listL
         err <- wrapError $ raw_clEnqueueTask queue kernel (fromIntegral num_events_in_wait_list) event_wait_list event 
-        if err == Nothing
-            then Right <$> peek event
-            else return $ Left . fromJust $ err
+        handleEither err $ \_ -> Right <$> peek event
     where num_events_in_wait_list = length event_wait_listL
 
 clEnqueueNativeKernel :: NativeKernelCallback -> Ptr () -> CLsizei -> [Mem] -> [Ptr ()] -> [Event] -> IO (Either ErrorCode Event)
@@ -96,8 +89,6 @@ clEnqueueNativeKernel user_funcF args cb_args mem_listL args_mem_locL event_wait
         pokeArray mem_list mem_listL
         pokeArray args_mem_loc args_mem_locL
         err <- wrapError $ raw_clEnqueueNativeKernel user_func args cb_args (fromIntegral num_mem_objects) mem_list args_mem_loc (fromIntegral num_events_in_wait_list) event_wait_list event
-        if err == Nothing
-            then Right <$> peek event
-            else return $ Left . fromJust $ err
+        handleEither err $ \_ -> Right <$> peek event
     where num_events_in_wait_list = length event_wait_listL
           num_mem_objects = length mem_listL

@@ -33,7 +33,7 @@
     
     _General Notes on the differences between Haskell and the OpenCL-C implementation_
     
-    * Side-effectful procedures capable of returning an error code only return a Maybe ErrorCode, with Nothing returned upon success
+    * Side-effectful procedures capable of returning an error code only return a Either ErrorCode (), with Nothing returned upon success
     
     * Procedures which follow the pattern of returning a pointer to an object and taking a final parameter as an error code instead
       return Either ErrorCode @ObjectType@ 

@@ -26,10 +26,10 @@ clCreateContextFromType properties (DeviceType device_type) pfn_notify user_data
     fptr <- maybe (return nullFunPtr) wrapContextCallback pfn_notify
     wrapErrorEither $ raw_clCreateContextFromType propertiesP device_type fptr user_data
     
-clRetainContext :: Context -> IO (Maybe ErrorCode)
+clRetainContext :: Context -> IO (Either ErrorCode ())
 clRetainContext ctx = wrapError (raw_clRetainContext ctx)
 
-clReleaseContext :: Context -> IO (Maybe ErrorCode)
+clReleaseContext :: Context -> IO (Either ErrorCode ())
 clReleaseContext ctx = wrapError (raw_clReleaseContext ctx)
 
 clGetContextInfo :: Context -> ContextInfo -> IO (Either ErrorCode CLContextInfoRetval)

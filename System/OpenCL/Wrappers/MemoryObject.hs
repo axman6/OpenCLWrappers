@@ -43,22 +43,22 @@ clCreateImage3D ctx (MemFlags memflags) (ChannelOrder corder, ChannelType ctype)
     pokeArray image_format [corder,ctype] 
     wrapErrorEither $ raw_clCreateImage3D ctx memflags image_format image_width image_height image_depth image_row_pitch image_slice_pitch host_ptr 
                         
-clRetainMemObject :: Mem -> IO (Maybe ErrorCode) 
+clRetainMemObject :: Mem -> IO (Either ErrorCode ()) 
 clRetainMemObject mem = wrapError $ raw_clRetainMemObject mem
 
-clReleaseMemObject :: Mem -> IO (Maybe ErrorCode) 
+clReleaseMemObject :: Mem -> IO (Either ErrorCode ()) 
 clReleaseMemObject mem = wrapError $ raw_clReleaseMemObject mem
                                     
 clGetSupportedImageFormats :: Context -> MemFlags -> MemObjectType -> IO (Either ErrorCode [ImageFormat])
 clGetSupportedImageFormats ctx (MemFlags flags) (MemObjectType image_type) = allocaArray 512 $ \image_formats -> alloca $ \num_image_formats -> do
     err <- wrapError $ raw_clGetSupportedImageFormats ctx flags image_type 512 image_formats num_image_formats
-    maybe (do num_image_formatsN <- peek num_image_formats
-              image_formatsN <- peekArray (fromIntegral num_image_formatsN*2) image_formats
-              let sift (a:b:cs) = (ChannelOrder a,ChannelType b) : sift cs
-                  sift [] = [] 
-              return . Right $ sift image_formatsN )
-          (return . Left) 
-          err
+    handleEither err $ \_ -> do
+        num_image_formatsN <- peek num_image_formats
+        image_formatsN <- peekArray (fromIntegral num_image_formatsN*2) image_formats
+        let sift (a:b:cs) = (ChannelOrder a,ChannelType b) : sift cs
+            sift [] = [] 
+        return . Right $ sift image_formatsN
+
 
 clGetMemObjectInfo :: Mem -> MemInfo -> IO (Either ErrorCode CLMemObjectInfoRetval)
 clGetMemObjectInfo mem (MemInfo param_name) = (wrapGetInfo $ raw_clGetMemObjectInfo mem param_name) >>=
@@ -86,9 +86,7 @@ clGetImageInfo mem (MemInfo param_name) = (wrapGetInfo $ raw_clGetImageInfo mem 
 enqueue :: (CommandQueue -> CLuint -> Ptr Event -> Ptr Event -> IO CLint) -> CommandQueue -> [Event] -> IO (Either ErrorCode Event)      
 enqueue fn queue events = alloca $ \event -> withArrayNull events $ \event_wait_list -> do
     err <- wrapError $ fn queue (fromIntegral events_in_wait_list) event_wait_list event
-    if err == Nothing 
-        then Right <$> peek event 
-        else return (Left . fromJust $ err)
+    handleEither err $ \_ -> Right <$> peek event 
     where events_in_wait_list = length events
     
     

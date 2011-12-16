@@ -8,8 +8,8 @@ import System.OpenCL.Wrappers.Utils
 import System.OpenCL.Wrappers.Raw
 
 
-clFlush :: CommandQueue -> IO (Maybe ErrorCode)
+clFlush :: CommandQueue -> IO (Either ErrorCode ())
 clFlush queue = wrapError $ raw_clFlush queue
 
-clFinish :: CommandQueue -> IO (Maybe ErrorCode)
+clFinish :: CommandQueue -> IO (Either ErrorCode ())
 clFinish queue = wrapError $ raw_clFinish queue

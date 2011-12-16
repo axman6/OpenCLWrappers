@@ -11,17 +11,19 @@ import System.OpenCL.Wrappers.Kernel
 import System.OpenCL.Wrappers.Types
 import System.OpenCL.Wrappers.ProgramObject
 import System.OpenCL.Wrappers.FlushFinish
+import System.OpenCL.Wrappers.Utils (handleEither)
 import Foreign.Marshal
 import Foreign.Storable
 import Foreign.Ptr
 
-pushKernelParams :: forall b. Storable b => Kernel -> CLuint -> [b] -> IO (Maybe ErrorCode)
-pushKernelParams kernel argNum (x:xs) = 
-    withArray [x] (\y -> clSetKernelArg kernel argNum (fromIntegral.sizeOf $ x) (castPtr y)) >>=
-        maybe (pushKernelParams kernel (argNum + 1) xs) (return.Just)
+pushKernelParams :: forall b. Storable b => Kernel -> CLuint -> [b] -> IO (Either ErrorCode ())
+pushKernelParams kernel argNum (x:xs) = do
+    err <- withArray [x] $ \y ->
+		clSetKernelArg kernel argNum (fromIntegral.sizeOf $ x) (castPtr y)
+    handleEither err $ \_ -> pushKernelParams kernel (argNum + 1) xs
 pushKernelParams _ _ _ = return Nothing
 
-syncKernelFun :: forall b. Storable b => CLuint -> Kernel -> CommandQueue -> [CLsizei] -> [CLsizei] -> [b] -> IO (Maybe ErrorCode)
+syncKernelFun :: forall b. Storable b => CLuint -> Kernel -> CommandQueue -> [CLsizei] -> [CLsizei] -> [b] -> IO (Either ErrorCode ())
 syncKernelFun _ kernel queue a b [] =
         clEnqueueNDRangeKernel queue kernel a b [] >>=
             either (return.Just) (\_ -> clFinish queue >>= maybe (return Nothing) (return.Just))
@@ -29,7 +31,7 @@ syncKernelFun argNum kernel queue a b (x:xs) =
         withArray [x] (\y -> clSetKernelArg kernel argNum (fromIntegral.sizeOf $ x) (castPtr y)) >>=
             maybe (syncKernelFun (argNum + 1) kernel queue a b xs) (return.Just)
 
-createSyncKernel :: forall b. Storable b => Program -> CommandQueue -> String -> [Int] -> [Int] -> IO (Either ErrorCode ([b] -> IO (Maybe ErrorCode)))
+createSyncKernel :: forall b. Storable b => Program -> CommandQueue -> String -> [Int] -> [Int] -> IO (Either ErrorCode ([b] -> IO (Either ErrorCode ())))
 createSyncKernel program queue initFun globalWorkRange localWorkRange =
         clCreateKernel program initFun >>=
             either (return.Left) (\k -> return.Right $ syncKernelFun 0 k queue (map fromIntegral globalWorkRange) (map fromIntegral localWorkRange))

@@ -19,10 +19,10 @@ clCreateSampler :: Context -> Bool -> AddressingMode -> FilterMode -> IO (Either
 clCreateSampler ctx normalized_coords (AddressingMode addressing_mode) (FilterMode filter_mode) = 
     wrapErrorEither $ raw_clCreateSampler ctx (if normalized_coords then clTrue else clFalse) addressing_mode filter_mode
 
-clRetainSampler :: Sampler -> IO (Maybe ErrorCode) 
+clRetainSampler :: Sampler -> IO (Either ErrorCode ()) 
 clRetainSampler sampler = wrapError $ raw_clRetainSampler sampler
 
-clReleaseSampler :: Sampler -> IO (Maybe ErrorCode) 
+clReleaseSampler :: Sampler -> IO (Either ErrorCode ()) 
 clReleaseSampler sampler = wrapError $ raw_clReleaseSampler sampler
 
 clGetSamplerInfo :: Sampler -> SamplerInfo -> IO (Either ErrorCode CLSamplerInfoRetval)

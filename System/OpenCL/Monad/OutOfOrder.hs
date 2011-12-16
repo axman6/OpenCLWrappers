@@ -4,7 +4,7 @@ module System.OpenCL.Monad.OutOfOrder
     ,clEnqueueBarrier)
 where 
 
-import qualified System.OpenCL.Wrappers.Helpers as O
+import qualified System.OpenCL.Wrappers.OutOfOrder as O
 import System.OpenCL.Wrappers.Types
 import System.OpenCL.Monad.Types
 

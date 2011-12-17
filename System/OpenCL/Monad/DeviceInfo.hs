@@ -1,4 +1,4 @@
-module System.OpenCL.Monads.DeviceInfo
+module System.OpenCL.Monad.DeviceInfo
     (clGetDeviceIDs
     ,clGetDeviceInfo)
 where

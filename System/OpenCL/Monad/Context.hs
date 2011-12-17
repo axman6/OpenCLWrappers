@@ -1,4 +1,4 @@
-module System.OpenCL.Monads.Context 
+module System.OpenCL.Monad.Context 
     (clCreateContext
     ,clCreateContextFromType
     ,clRetainContext

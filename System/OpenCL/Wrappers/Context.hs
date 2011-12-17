@@ -15,13 +15,25 @@ import Foreign.Marshal.Array(withArray)
 
 
 clCreateContext :: [ContextProperties] -> [DeviceID] -> (Maybe ContextCallback) -> Ptr () -> IO (Either ErrorCode Context)
-clCreateContext properties devices pfn_notify user_dat =
-    withArrayNull0 nullPtr properties $ \propertiesP -> withArray devices $ \devicesP -> do
+clCreateContext [] devices pfn_notify user_dat = do
+    withArray devices $ \devicesP -> do
         fptr <- maybe (return nullFunPtr) wrapContextCallback pfn_notify
-        wrapErrorEither $ raw_clCreateContext propertiesP (fromIntegral devicesN) devicesP fptr user_dat             
+        wrapErrorEither $ raw_clCreateContext nullPtr (fromIntegral devicesN) devicesP fptr user_dat
+    where devicesN = length devices
+
+
+clCreateContext properties devices pfn_notify user_dat = do
+    withArrayNull0 nullPtr properties $ \propertiesP -> do
+        withArray devices $ \devicesP -> do
+            fptr <- maybe (return nullFunPtr) wrapContextCallback pfn_notify
+            wrapErrorEither $ raw_clCreateContext propertiesP (fromIntegral devicesN) devicesP fptr user_dat             
     where devicesN = length devices
           
 clCreateContextFromType :: [ContextProperties] -> DeviceType -> (Maybe ContextCallback) -> Ptr () -> IO (Either ErrorCode Context)
+clCreateContextFromType [] (DeviceType device_type) pfn_notify user_data = do
+    fptr <- maybe (return nullFunPtr) wrapContextCallback pfn_notify
+    wrapErrorEither $ raw_clCreateContextFromType nullPtr device_type fptr user_data
+
 clCreateContextFromType properties (DeviceType device_type) pfn_notify user_data = withArrayNull0 nullPtr properties $ \propertiesP -> do
     fptr <- maybe (return nullFunPtr) wrapContextCallback pfn_notify
     wrapErrorEither $ raw_clCreateContextFromType propertiesP device_type fptr user_data

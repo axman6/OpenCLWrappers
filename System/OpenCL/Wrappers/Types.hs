@@ -1,10 +1,16 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+-- , ForeignFunctionInterface, CPP
 {-| Declaration of types, bounds and constants -}
 module System.OpenCL.Wrappers.Types where
+
+-- #define <OpenCL/opencl.h>
 
 import Foreign.C.Types
 import Foreign.C.String(CString)
 import Foreign
+import Control.Monad.Error
+import Text.Printf
+import Data.Bits
 
 data PlatformIDc = PlatformIDc
 data DeviceIDc = DeviceIDc
@@ -48,10 +54,66 @@ newtype DeviceType = DeviceType CLbitfield
 newtype ContextInfo = ContextInfo CLuint
     deriving (Eq)
 newtype CommandQueueProperties = CommandQueueProperties CLbitfield
-    deriving (Eq,Storable)
+    deriving (Eq,Storable, Show)
 newtype CommandQueueInfo = CommandQueueInfo CLuint
     deriving (Eq)
-newtype ErrorCode = ErrorCode CLint deriving (Eq,Ord,Show,Read)
+newtype ErrorCode = ErrorCode CLint deriving (Eq,Ord,Read)
+instance Show ErrorCode where
+    -- show (ErrorCode x) = "ErrorCode " ++ show x
+    show (ErrorCode x) = case x of
+        (0) -> "clSuccess"
+        (-1) -> "clDeviceNotFound"
+        (-2) -> "clDeviceNotAvailable"
+        (-3) -> "clCompilerNotAvailable"
+        (-4) -> "clMemObjectAllocationFailure"
+        (-5) -> "clOutOfResources"
+        (-6) -> "clOutOfHostMemory"
+        (-7) -> "clProfilingInfoNotAvailable"
+        (-8) -> "clMemCopyOverlap"
+        (-9) -> "clImageFormatMismatch"
+        (-10) -> "clImageFormatNotSupported"
+        (-11) -> "clBuildProgramFailure"
+        (-12) -> "clMapFailure"
+        (-30) -> "clInvalidValue"
+        (-31) -> "clInvalidDeviceType"
+        (-32) -> "clInvalidPlatform"
+        (-33) -> "clInvalidDevice"
+        (-34) -> "clInvalidContext"
+        (-35) -> "clInvalidQueueProperties"
+        (-36) -> "clInvalidCommandQueue"
+        (-37) -> "clInvalidHostPtr"
+        (-38) -> "clInvalidMemObject"
+        (-39) -> "clInvalidImageFormatDescriptor"
+        (-40) -> "clInvalidImageSize"
+        (-41) -> "clInvalidSampler"
+        (-42) -> "clInvalidBinary"
+        (-43) -> "clInvalidBuildOptions"
+        (-44) -> "clInvalidProgram"
+        (-45) -> "clInvalidProgramExecutable"
+        (-46) -> "clInvalidKernelName"
+        (-47) -> "clInvalidKernelDefinition"
+        (-48) -> "clInvalidKernel"
+        (-49) -> "clInvalidArgIndex"
+        (-50) -> "clInvalidArgValue"
+        (-51) -> "clInvalidArgSize"
+        (-52) -> "clInvalidKernelArgs"
+        (-53) -> "clInvalidWorkDimension"
+        (-54) -> "clInvalidWorkGroupSize"
+        (-55) -> "clInvalidWorkItemSize"
+        (-56) -> "clInvalidGlobalOffset"
+        (-57) -> "clInvalidEventWaitList"
+        (-58) -> "clInvalidEvent"
+        (-59) -> "clInvalidOperation"
+        (-60) -> "clInvalidGLObject"
+        (-61) -> "clInvalidBufferSize"
+        (-62) -> "clInvalidMipLevel"
+        (-63) -> "clInvalidGlobalWorkSize"
+        (-64) -> "clInvalidPorperty"
+        _     -> "Unknown ErrorCode: " ++ show x
+instance Error ErrorCode where
+    noMsg = ErrorCode 1
+    strMsg s = ErrorCode 2
+
 newtype EventInfo = EventInfo CLuint
     deriving (Eq)
 newtype ProfilingInfo = ProfilingInfo CLuint
@@ -62,7 +124,19 @@ newtype KernelWorkGroupInfo = KernelWorkGroupInfo CLuint
     deriving (Eq)
 newtype MapFlags = MapFlags CLbitfield
 newtype MemFlags = MemFlags CLbitfield
-    deriving (Eq,Storable)
+    deriving (Eq,Storable, Num, Show)
+instance Bits MemFlags where
+    (.&.) = wrapMFOp (.&.)
+    (.|.) = wrapMFOp (.|.)
+    xor   = wrapMFOp xor
+    complement (MemFlags x) = MemFlags (complement x)
+    bitSize _ = bitSize (undefined :: CLbitfield)
+    isSigned _ = False
+
+
+wrapMFOp :: (CLbitfield -> CLbitfield -> CLbitfield) -> MemFlags -> MemFlags -> MemFlags
+wrapMFOp f (MemFlags a) (MemFlags b) = MemFlags $ f a b
+
 newtype MemObjectType = MemObjectType CLuint
     deriving (Eq,Storable)
 newtype MemInfo = MemInfo CLuint
@@ -80,9 +154,9 @@ newtype ProgramInfo = ProgramInfo CLuint
 newtype ProgramBuildInfo = ProgramBuildInfo CLuint
     deriving (Eq)
 newtype BuildStatus = BuildStatus CLint
-    deriving (Eq)
+    deriving (Eq, Show)
 newtype DeviceInfo = DeviceInfo CLuint
-    deriving (Eq)
+    deriving (Eq, Show)
 newtype DeviceFPConfig = DeviceFPConfig CLbitfield
     deriving (Eq,Storable)
 newtype CommandType = CommandType CLuint
@@ -92,7 +166,7 @@ newtype DeviceExecCapabilities = DeviceExecCapabilities CLbitfield
 newtype DeviceMemCacheType = DeviceMemCacheType CLuint
     deriving (Eq,Storable)
 newtype DeviceLocalMemType = DeviceLocalMemType CLuint
-    deriving (Eq,Storable)
+    deriving (Eq,Storable, Show)
 
 data CLKernelInfoRetval = KernelInfoRetvalString String | KernelInfoRetvalCLuint CLuint | KernelInfoRetvalContext Context | KernelInfoRetvalProgram Program
     deriving(Eq)
@@ -110,12 +184,65 @@ data CLContextInfoRetval = ContextInfoRetvalCLuint CLuint | ContextInfoRetvalDev
     deriving(Eq)
 data CLCommandQueueInfoRetval = CommandQueueInfoRetvalContext Context | CommandQueueInfoRetvalDeviceID DeviceID | CommandQueueInfoRetvalCLuint CLuint | CommandQueueInfoRetvalCommandQueueProperties CommandQueueProperties
     deriving(Eq)
-data CLDeviceInfoRetval = DeviceInfoRetvalString String | DeviceInfoRetvalCLuint CLuint | DeviceInfoRetvalCLbool CLbool | DeviceInfoRetvalDeviceFPConfig DeviceFPConfig | DeviceInfoRetvalDeviceExecCapabilities DeviceExecCapabilities | DeviceInfoRetvalCLulong CLulong | DeviceInfoRetvalDeviceMemCacheType DeviceMemCacheType | DeviceInfoRetvalCLsizei CLsizei | DeviceInfoRetvalDeviceLocalMemType DeviceLocalMemType | DeviceInfoRetvalCLsizeiList [CLsizei] | DeviceInfoRetvalPlatformID PlatformID | DeviceInfoRetvalCommandQueueProperties CommandQueueProperties | DeviceInfoRetvalDeviceType DeviceType
+data CLDeviceInfoRetval
+    = DeviceInfoRetvalString String
+    | DeviceInfoRetvalCLuint CLuint
+    | DeviceInfoRetvalCLbool CLbool
+    | DeviceInfoRetvalDeviceFPConfig DeviceFPConfig
+    | DeviceInfoRetvalDeviceExecCapabilities DeviceExecCapabilities
+    | DeviceInfoRetvalCLulong CLulong
+    | DeviceInfoRetvalDeviceMemCacheType DeviceMemCacheType
+    | DeviceInfoRetvalCLsizei CLsizei
+    | DeviceInfoRetvalDeviceLocalMemType DeviceLocalMemType
+    | DeviceInfoRetvalCLsizeiList [CLsizei]
+    | DeviceInfoRetvalPlatformID PlatformID
+    | DeviceInfoRetvalCommandQueueProperties CommandQueueProperties
+    | DeviceInfoRetvalDeviceType DeviceType
     deriving(Eq)
+
+toHex :: Integral a => a -> String
+toHex = printf "0x%0x" . (fromIntegral :: Integral a => a -> Int)
+
+instance Show CLDeviceInfoRetval where
+    show (DeviceInfoRetvalString str)
+        = "DeviceInfoRetvalString " ++ show str
+    show (DeviceInfoRetvalCLuint cint)
+        = "DeviceInfoRetvalCLuint " ++ show cint
+    show (DeviceInfoRetvalCLbool b)
+        = "DeviceInfoRetvalCLbool " ++ show b
+    show (DeviceInfoRetvalDeviceFPConfig devconfig)
+        = "DeviceInfoRetvalDeviceFPConfig " ++ show devconfig
+    show (DeviceInfoRetvalDeviceExecCapabilities (DeviceExecCapabilities dec))
+        = "DeviceInfoRetvalDeviceExecCapabilities " ++ printf "0x%0x" (fromIntegral dec :: Int)
+    show (DeviceInfoRetvalCLulong clong)
+        = "DeviceInfoRetvalCLulong " ++ toHex clong
+    show (DeviceInfoRetvalDeviceMemCacheType (DeviceMemCacheType cuint))
+        = "DeviceInfoRetvalDeviceMemCacheType " ++ toHex cuint
+    show (DeviceInfoRetvalCLsizei clsize)
+        = "DeviceInfoRetvalCLsizei " ++ toHex clsize
+    show (DeviceInfoRetvalDeviceLocalMemType di)
+        = "DeviceInfoRetvalDeviceLocalMemType " ++ show di
+    show (DeviceInfoRetvalCLsizeiList cs)
+        = "DeviceInfoRetvalCLsizeiList " ++ show cs
+    show (DeviceInfoRetvalPlatformID pi)
+        = "DeviceInfoRetvalPlatformID " ++ show pi
+    show (DeviceInfoRetvalCommandQueueProperties qprops)
+        = "DeviceInfoRetvalCommandQueueProperties " ++ show qprops
+    show (DeviceInfoRetvalDeviceType dt)
+        = "DeviceInfoRetvalDeviceType " ++ show dt
+    
+    
+
 data CLProgramInfoRetval = ProgramInfoRetvalCLUint CLuint | ProgramInfoRetvalContext Context | ProgramInfoRetvalDeviceIDList [DeviceID] | ProgramInfoRetvalString String | ProgramInfoRetvalPtrList [Ptr ()] | ProgramInfoRetvalCLsizeiList [CLsizei]
     deriving(Eq)
-data CLProgramBuildInfoRetval = ProgramBuildInfoRetvalBuildStatus BuildStatus | ProgramBuildInfoRetvalString String
+data CLProgramBuildInfoRetval
+    = ProgramBuildInfoRetvalBuildStatus BuildStatus
+    | ProgramBuildInfoRetvalString String
     deriving(Eq)
+instance Show CLProgramBuildInfoRetval where
+    show (ProgramBuildInfoRetvalString str) = str
+    show (ProgramBuildInfoRetvalBuildStatus bs) = show bs
+
 data CLPlatformInfoRetval = PlatformInfoRetvalString String
     deriving(Eq)
 data CLSamplerInfoRetval = SamplerInfoRetvalCLuint CLuint | SamplerInfoRetvalContext Context | SamplerInfoRetvalAddressingMode AddressingMode | SamplerInfoRetvalFilterMode FilterMode | SamplerInfoRetvalCLbool CLbool
@@ -318,6 +445,17 @@ clFPRoundToInf = DeviceFPConfig (1`shiftL`4)
 clFPFMA :: DeviceFPConfig 
 clFPFMA = DeviceFPConfig (1`shiftL`5)
 
+instance Show DeviceFPConfig where
+    show x | x == clFPDenorm = "clFPDenorm"
+           | x == clFPInfNan = "clFPInfNan"
+           | x == clFPRoundToNearest = "clFPRoundToNearest"
+           | x == clFPRoundToZero = "clFPRoundToZero"
+           | x == clFPRoundToInf = "clFPRoundToInf"
+           | x == clFPFMA = "clFPFMA"
+           | otherwise = "Unknown DeviceFPConfig"
+           
+           
+           
 
 
 clEventCommandQueue  :: EventInfo 
@@ -364,6 +502,15 @@ clDeviceTypeAccelerator = DeviceType (1`shiftL`3)
 
 clDeviceTypeAll :: DeviceType 
 clDeviceTypeAll = DeviceType 0xFFFFFFFF
+
+instance Show DeviceType where
+    show x@(DeviceType y)
+        | x == clDeviceTypeDefault = "clDeviceTypeDefault"
+        | x == clDeviceTypeCPU = "clDeviceTypeCPU"
+        | x == clDeviceTypeGPU = "clDeviceTypeGPU"
+        | x == clDeviceTypeAccelerator = "clDeviceTypeAccelerator"
+        | x == clDeviceTypeAll = "clDeviceTypeAll"
+        | otherwise = "Unknown DeviceType: " ++ toHex y
 
 
 clContextReferenceCount :: ContextInfo 
